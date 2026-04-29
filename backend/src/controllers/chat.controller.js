@@ -2,6 +2,7 @@ import { ChatThread } from "../models/chatThread.model.js";
 import { Ticket } from "../models/ticket.model.js";
 import { ok, created, fail } from "../utils/response.js";
 import { getAIReply, FALLBACK_MESSAGE } from "../services/ai.service.js";
+import { getRelevantMemory, saveMessageMemory } from "../services/memory.service.js";
 import { shouldEscalate } from "../utils/decisionEngine.js";
 import { emitToUser, emitToRole } from "../sockets/index.js";
 
@@ -28,7 +29,18 @@ const sendMessage = async (req, res, next) => {
       userId
     });
 
-    const aiReply = await getAIReply(message);
+    let memoryMessages = [];
+    try {
+      memoryMessages = await getRelevantMemory({ userId, message });
+    } catch (error) {
+      console.error("Memory lookup error:", error?.message || error);
+    }
+
+    const contextPrompt = memoryMessages.length
+      ? `Context from past:\n${memoryMessages.map((text) => `- ${text}`).join("\n")}\n\nUser: ${message}`
+      : message;
+
+    const aiReply = await getAIReply(contextPrompt);
     chat.messages.push({ sender: "ai", text: aiReply });
     await chat.save();
     emitToUser(userId, "chat:message", {
@@ -36,6 +48,13 @@ const sendMessage = async (req, res, next) => {
       text: aiReply,
       userId
     });
+
+    try {
+      await saveMessageMemory({ userId, message });
+      await saveMessageMemory({ userId, message: aiReply });
+    } catch (error) {
+      console.error("Memory save error:", error?.message || error);
+    }
 
     if (shouldEscalate(message, aiReply)) {
       const ticket = await Ticket.create({
