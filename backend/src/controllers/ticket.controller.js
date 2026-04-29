@@ -1,0 +1,300 @@
+import { Ticket } from "../models/ticket.model.js";
+import { ChatThread } from "../models/chatThread.model.js";
+import { ok, created, fail } from "../utils/response.js";
+import { getSuggestedReplies } from "../services/ai.service.js";
+import { emitToUser, emitToRole } from "../sockets/index.js";
+
+const listTickets = async (req, res, next) => {
+  try {
+    const { status } = req.query;
+    const filter = { orgId: req.user.orgId };
+
+    if (status) {
+      filter.status = status;
+    }
+
+    const tickets = await Ticket.find(filter).sort({ createdAt: -1 });
+    return ok(res, "Tickets fetched", { tickets });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const getTicket = async (req, res, next) => {
+  try {
+    const ticket = await Ticket.findOne({ _id: req.params.id, orgId: req.user.orgId });
+    if (!ticket) {
+      return fail(res, 404, "Ticket not found");
+    }
+
+    return ok(res, "Ticket fetched", { ticket });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const takeTicket = async (req, res, next) => {
+  try {
+    const ticket = await Ticket.findOneAndUpdate(
+      { _id: req.params.id, assignedTo: null, status: "open", orgId: req.user.orgId },
+      { assignedTo: req.user.id, status: "in-progress" },
+      { new: true }
+    );
+
+    if (!ticket) {
+      return fail(res, 409, "Already taken");
+    }
+
+    emitToUser(ticket.userId?.toString(), "ticket:assigned", {
+      ticketId: ticket._id,
+      assignedTo: req.user.id
+    });
+    emitToUser(req.user.id, "ticket:assigned", {
+      ticketId: ticket._id,
+      assignedTo: req.user.id
+    });
+    emitToRole(ticket.orgId?.toString(), "admin", "ticket:assigned", {
+      ticketId: ticket._id,
+      assignedTo: req.user.id
+    });
+
+    return ok(res, "Ticket assigned", { ticket });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const assignTicket = async (req, res, next) => {
+  try {
+    const { agentId } = req.body;
+    if (!agentId) {
+      return fail(res, 400, "agentId is required");
+    }
+
+    const ticket = await Ticket.findOneAndUpdate(
+      { _id: req.params.id, orgId: req.user.orgId },
+      { assignedTo: agentId, status: "in-progress" },
+      { new: true }
+    );
+
+    if (!ticket) {
+      return fail(res, 404, "Ticket not found");
+    }
+
+    emitToUser(ticket.userId?.toString(), "ticket:assigned", {
+      ticketId: ticket._id,
+      assignedTo: agentId
+    });
+    emitToUser(agentId, "ticket:assigned", {
+      ticketId: ticket._id,
+      assignedTo: agentId
+    });
+    emitToRole(ticket.orgId?.toString(), "admin", "ticket:assigned", {
+      ticketId: ticket._id,
+      assignedTo: agentId
+    });
+
+    return ok(res, "Ticket assigned", { ticket });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const updateStatus = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    if (!status) {
+      return fail(res, 400, "status is required");
+    }
+
+    const ticket = await Ticket.findOne({ _id: req.params.id, orgId: req.user.orgId });
+    if (!ticket) {
+      return fail(res, 404, "Ticket not found");
+    }
+
+    if (req.user.role === "agent" && ticket.assignedTo?.toString() !== req.user.id) {
+      return fail(res, 403, "Only the assigned agent can update status");
+    }
+
+    ticket.status = status;
+    await ticket.save();
+
+    emitToUser(ticket.userId?.toString(), "ticket:status", {
+      ticketId: ticket._id,
+      status: ticket.status
+    });
+
+    if (ticket.assignedTo) {
+      emitToUser(ticket.assignedTo.toString(), "ticket:status", {
+        ticketId: ticket._id,
+        status: ticket.status
+      });
+    }
+    emitToRole(ticket.orgId?.toString(), "admin", "ticket:status", {
+      ticketId: ticket._id,
+      status: ticket.status
+    });
+
+    return ok(res, "Status updated", { ticket });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const replyToTicket = async (req, res, next) => {
+  try {
+    const { message } = req.body;
+    if (!message || !message.trim()) {
+      return fail(res, 400, "message is required");
+    }
+
+    const ticket = await Ticket.findOne({ _id: req.params.id, orgId: req.user.orgId });
+    if (!ticket) {
+      return fail(res, 404, "Ticket not found");
+    }
+
+    if (req.user.role === "agent" && ticket.assignedTo?.toString() !== req.user.id) {
+      return fail(res, 403, "Only the assigned agent can reply");
+    }
+
+    ticket.messages.push({ sender: "agent", text: message });
+    await ticket.save();
+
+    await ChatThread.findOneAndUpdate(
+      { userId: ticket.userId, orgId: ticket.orgId },
+      { $push: { messages: { sender: "agent", text: message } } },
+      { new: true, upsert: true }
+    );
+
+    emitToUser(ticket.userId?.toString(), "ticket:message", {
+      ticketId: ticket._id,
+      sender: "agent",
+      text: message
+    });
+
+    if (ticket.assignedTo) {
+      emitToUser(ticket.assignedTo.toString(), "ticket:message", {
+        ticketId: ticket._id,
+        sender: "agent",
+        text: message
+      });
+    }
+    emitToRole(ticket.orgId?.toString(), "admin", "ticket:message", {
+      ticketId: ticket._id,
+      sender: "agent",
+      text: message
+    });
+
+    return created(res, "Reply sent", { ticket });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const deleteTicket = async (req, res, next) => {
+  try {
+    const ticket = await Ticket.findOne({ _id: req.params.id, orgId: req.user.orgId });
+    if (!ticket) {
+      return fail(res, 404, "Ticket not found");
+    }
+
+    if (ticket.status !== "resolved") {
+      return fail(res, 409, "Only resolved tickets can be deleted");
+    }
+
+    await ticket.deleteOne();
+
+    emitToUser(ticket.userId?.toString(), "ticket:deleted", {
+      ticketId: ticket._id
+    });
+    if (ticket.assignedTo) {
+      emitToUser(ticket.assignedTo.toString(), "ticket:deleted", {
+        ticketId: ticket._id
+      });
+    }
+    emitToRole(ticket.orgId?.toString(), "admin", "ticket:deleted", { ticketId: ticket._id });
+    emitToRole(ticket.orgId?.toString(), "agent", "ticket:deleted", { ticketId: ticket._id });
+
+    return ok(res, "Ticket deleted", { ticketId: ticket._id });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const getAnalytics = async (req, res, next) => {
+  try {
+    const orgId = req.user.orgId;
+    const total = await Ticket.countDocuments({ orgId });
+    const byStatusAgg = await Ticket.aggregate([
+      { $match: { orgId } },
+      { $group: { _id: "$status", count: { $sum: 1 } } }
+    ]);
+
+    const byStatus = { open: 0, "in-progress": 0, resolved: 0 };
+    byStatusAgg.forEach((item) => {
+      byStatus[item._id] = item.count;
+    });
+
+    const since = new Date();
+    since.setDate(since.getDate() - 6);
+    since.setHours(0, 0, 0, 0);
+
+    const dailyAgg = await Ticket.aggregate([
+      { $match: { orgId, createdAt: { $gte: since } } },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
+          },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const dailyMap = new Map(dailyAgg.map((item) => [item._id, item.count]));
+    const daily = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(since);
+      date.setDate(since.getDate() + index);
+      const key = date.toISOString().slice(0, 10);
+      return { date: key, count: dailyMap.get(key) || 0 };
+    });
+
+    return ok(res, "Analytics", { total, byStatus, daily });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const getSuggestions = async (req, res, next) => {
+  try {
+    const ticket = await Ticket.findOne({ _id: req.params.id, orgId: req.user.orgId });
+    if (!ticket) {
+      return fail(res, 404, "Ticket not found");
+    }
+
+    if (req.user.role === "agent" && ticket.assignedTo && ticket.assignedTo.toString() !== req.user.id) {
+      return fail(res, 403, "Forbidden");
+    }
+
+    const suggestions = await getSuggestedReplies({
+      issue: ticket.issue,
+      messages: ticket.messages || []
+    });
+
+    return ok(res, "Suggestions", { suggestions });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export {
+  listTickets,
+  getTicket,
+  takeTicket,
+  assignTicket,
+  updateStatus,
+  replyToTicket,
+  deleteTicket,
+  getAnalytics,
+  getSuggestions
+};
