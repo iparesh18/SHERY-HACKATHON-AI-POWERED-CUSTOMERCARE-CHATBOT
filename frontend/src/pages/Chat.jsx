@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Button from "../components/Button.jsx";
 import ChatMessage from "../components/ChatMessage.jsx";
+import SkeletonMessage from "../components/SkeletonMessage.jsx";
 import Input from "../components/Input.jsx";
 import { useAuth } from "../hooks/useAuth.js";
 import { useSocket } from "../hooks/useSocket.js";
@@ -63,7 +64,7 @@ const Chat = () => {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, sending]);
 
   const handleSend = async () => {
     if (!canSend) return;
@@ -123,6 +124,7 @@ const Chat = () => {
             {messages.map((message, index) => (
               <ChatMessage key={`${message.text}-${index}`} message={message} />
             ))}
+            {sending && <SkeletonMessage lines={3} />}
             <div ref={bottomRef} />
           </div>
         )}
