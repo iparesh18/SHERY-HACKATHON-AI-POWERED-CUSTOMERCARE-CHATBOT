@@ -1,6 +1,7 @@
 import http from "http";
 import { Server } from "socket.io";
 import { app } from "./app.js";
+
 import { connectDb } from "./config/db.js";
 import { env } from "./config/env.js";
 import { initSockets } from "./sockets/index.js";
