@@ -6,6 +6,7 @@ import { OrgInvite } from "../models/orgInvite.model.js";
 import { ok, created, fail } from "../utils/response.js";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../services/token.service.js";
 import { env } from "../config/env.js";
+import { blacklistToken, isBlacklisted } from "../services/tokenBlacklist.service.js";
 
 const normalizeOrgKey = (name) => (name || "").trim().toLowerCase();
 
@@ -145,6 +146,18 @@ const login = async (req, res, next) => {
 
 const logout = async (req, res, next) => {
   try {
+    const authHeader = req.headers.authorization || "";
+    const accessToken = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
+    const refreshToken = req.cookies?.refreshToken;
+
+    if (accessToken) {
+      await blacklistToken(accessToken);
+    }
+
+    if (refreshToken) {
+      await blacklistToken(refreshToken);
+    }
+
     res.clearCookie("refreshToken");
     return ok(res, "Logged out", null);
   } catch (error) {
@@ -156,6 +169,11 @@ const refresh = async (req, res, next) => {
   try {
     const token = req.cookies?.refreshToken;
     if (!token) {
+      return fail(res, 401, "Unauthorized");
+    }
+
+    const blacklisted = await isBlacklisted(token);
+    if (blacklisted) {
       return fail(res, 401, "Unauthorized");
     }
 

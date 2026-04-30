@@ -3,13 +3,16 @@ import Button from "../components/Button.jsx";
 import ChatMessage from "../components/ChatMessage.jsx";
 import Input from "../components/Input.jsx";
 import { useAuth } from "../hooks/useAuth.js";
+import { useSocket } from "../hooks/useSocket.js";
 import { useToast } from "../hooks/useToast.js";
 import { getChat, sendMessage } from "../services/chat.service.js";
 
 const Chat = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { pushToast } = useToast();
+  const { socket } = useSocket(token);
   const [messages, setMessages] = useState([]);
+  const [ticketMeta, setTicketMeta] = useState(null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
@@ -37,6 +40,28 @@ const Chat = () => {
   }, [user?.id]);
 
   useEffect(() => {
+    if (!socket) return undefined;
+
+    const mergeTicketMeta = (payload = {}) => {
+      if (!payload?.ticketId) return;
+
+      setTicketMeta((prev) => ({
+        ...(prev || {}),
+        ticketId: payload.ticketId,
+        status: payload.status || prev?.status || "open"
+      }));
+    };
+
+    socket.on("ticket:created", mergeTicketMeta);
+    socket.on("ticket:status", mergeTicketMeta);
+
+    return () => {
+      socket.off("ticket:created", mergeTicketMeta);
+      socket.off("ticket:status", mergeTicketMeta);
+    };
+  }, [socket]);
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
@@ -53,6 +78,10 @@ const Chat = () => {
       const payload = response.data || {};
       // ticket created (201) or backend explicitly returned ticketId
       if (response.status === 201 || payload?.ticketId) {
+        setTicketMeta({
+          ticketId: payload.ticketId || ticketMeta?.ticketId || null,
+          status: payload.status || "open"
+        });
         setMessages((prev) => [
           ...prev,
           { sender: "system", text: "Your issue has been escalated to support." }
@@ -77,6 +106,12 @@ const Chat = () => {
           <p className="text-sm text-muted">AI assistant + escalation to humans</p>
         </div>
       </div>
+
+      {ticketMeta?.ticketId && (
+        <div className="mt-4 rounded-2xl border border-ember/30 bg-ember/10 px-4 py-3 text-sm text-white">
+          Ticket {ticketMeta.ticketId} is {ticketMeta.status || "open"}. Chat history is preserved.
+        </div>
+      )}
 
       <div className="mt-6 h-[420px] overflow-y-auto rounded-2xl border border-white/10 bg-white/5 p-4">
         {loading ? (

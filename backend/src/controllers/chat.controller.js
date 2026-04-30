@@ -3,6 +3,7 @@ import { Ticket } from "../models/ticket.model.js";
 import { ok, created, fail } from "../utils/response.js";
 import { getAIReply, FALLBACK_MESSAGE } from "../services/ai.service.js";
 import { createMemory, queryMemory } from "../services/memory.service.js";
+import { getCache, setCache } from "../services/cache.service.js";
 import { shouldEscalate } from "../utils/decisionEngine.js";
 import { emitToUser, emitToRole } from "../sockets/index.js";
 
@@ -28,6 +29,26 @@ const sendMessage = async (req, res, next) => {
       text: message,
       userId
     });
+
+    const cacheKey = `chat:${userId}:${message.trim()}`;
+    const cachedReply = await getCache(cacheKey);
+    if (cachedReply) {
+      const cachedText = typeof cachedReply === "string" ? cachedReply : cachedReply?.reply;
+
+      if (cachedText) {
+        console.log("CACHE HIT");
+        chat.messages.push({ sender: "ai", text: cachedText });
+        await chat.save();
+
+        emitToUser(userId, "chat:message", {
+          sender: "ai",
+          text: cachedText,
+          userId
+        });
+
+        return res.status(200).json({ success: true, reply: cachedText });
+      }
+    }
 
     let memories = [];
     try {
@@ -110,6 +131,15 @@ Answer clearly and naturally.`;
         messages: [{ sender: "user", text: message }]
       });
 
+      chat.messages.push({ sender: "ai", text: displayReply });
+      await chat.save();
+
+      emitToUser(userId, "chat:message", {
+        sender: "ai",
+        text: displayReply,
+        userId
+      });
+
       emitToRole(orgId, "agent", "ticket:created", { ticketId: ticket._id, userId });
       emitToRole(orgId, "admin", "ticket:created", { ticketId: ticket._id, userId });
       emitToUser(userId, "ticket:created", { ticketId: ticket._id, status: ticket.status });
@@ -121,6 +151,8 @@ Answer clearly and naturally.`;
         status: ticket.status
       });
     }
+
+    await setCache(cacheKey, displayReply, 60);
 
     console.log("FINAL AI REPLY:", displayReply);
     return res.status(200).json({ success: true, reply: displayReply });

@@ -1,14 +1,20 @@
 import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
 import { fail } from "../utils/response.js";
+import { isBlacklisted } from "../services/tokenBlacklist.service.js";
 
-const authMiddleware = (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization || "";
     const tokenFromHeader = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
     const token = tokenFromHeader || req.cookies?.accessToken;
 
     if (!token) {
+      return fail(res, 401, "Unauthorized", null);
+    }
+
+    const blacklisted = await isBlacklisted(token);
+    if (blacklisted) {
       return fail(res, 401, "Unauthorized", null);
     }
 
