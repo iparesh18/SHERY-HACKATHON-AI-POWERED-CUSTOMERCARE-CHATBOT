@@ -2,7 +2,7 @@ import { ChatThread } from "../models/chatThread.model.js";
 import { Ticket } from "../models/ticket.model.js";
 import { ok, created, fail } from "../utils/response.js";
 import { getAIReply, FALLBACK_MESSAGE } from "../services/ai.service.js";
-import { getRelevantMemory, saveMessageMemory } from "../services/memory.service.js";
+import { createMemory, queryMemory } from "../services/memory.service.js";
 import { shouldEscalate } from "../utils/decisionEngine.js";
 import { emitToUser, emitToRole } from "../sockets/index.js";
 
@@ -29,34 +29,78 @@ const sendMessage = async (req, res, next) => {
       userId
     });
 
-    let memoryMessages = [];
+    let memories = [];
     try {
-      memoryMessages = await getRelevantMemory({ userId, message });
+      memories = await queryMemory({ query: message, limit: 5, namespace: userId });
     } catch (error) {
       console.error("Memory lookup error:", error?.message || error);
     }
 
-    const contextPrompt = memoryMessages.length
-      ? `Context from past:\n${memoryMessages.map((text) => `- ${text}`).join("\n")}\n\nUser: ${message}`
-      : message;
+    const memoryText = memories.length
+      ? memories.map((m, i) => `Memory ${i + 1}: ${m?.metadata?.text}`).join("\n")
+      : "No past memory";
 
-    const aiReply = await getAIReply(contextPrompt);
-    chat.messages.push({ sender: "ai", text: aiReply });
-    await chat.save();
-    emitToUser(userId, "chat:message", {
-      sender: "ai",
-      text: aiReply,
-      userId
-    });
+    const finalPrompt = `You are a smart AI assistant with memory.
 
-    try {
-      await saveMessageMemory({ userId, message });
-      await saveMessageMemory({ userId, message: aiReply });
-    } catch (error) {
-      console.error("Memory save error:", error?.message || error);
+You can remember past conversations.
+
+---
+
+PAST CONVERSATION:
+${memoryText}
+-------------
+
+CURRENT MESSAGE:
+${message}
+
+---
+
+RULES:
+
+* Use past conversation if relevant
+* If user asks about previous chat - answer using memory
+* DO NOT say "I don't remember"
+* If no memory - respond normally
+
+Answer clearly and naturally.`;
+
+    console.log("Memory used:", memoryText);
+
+    let aiReply = await getAIReply(finalPrompt);
+    if (!aiReply) aiReply = FALLBACK_MESSAGE;
+    console.log("AI RESPONSE:", aiReply);
+    
+    // Check if AI wants to escalate
+    const shouldEscalateNow = aiReply?.trim() === "ESCALATE_TO_AGENT" || shouldEscalate(message, aiReply);
+    
+    // Use friendly message for escalation or actual AI reply
+    const displayReply = shouldEscalateNow && aiReply?.trim() === "ESCALATE_TO_AGENT" 
+      ? "I'm connecting you with a support specialist who can better assist you."
+      : aiReply;
+
+    // Only save non-escalation AI responses to chat history and memory
+    if (!shouldEscalateNow || aiReply?.trim() !== "ESCALATE_TO_AGENT") {
+      chat.messages.push({ sender: "ai", text: displayReply });
+      await chat.save();
+      
+      emitToUser(userId, "chat:message", {
+        sender: "ai",
+        text: displayReply,
+        userId
+      });
+
+      try {
+        await createMemory({
+          id: `${userId}-${Date.now()}`,
+          content: `User: ${message}\nAI: ${displayReply}`,
+          namespace: userId
+        });
+      } catch (error) {
+        console.error("Memory save error:", error?.message || error);
+      }
     }
 
-    if (shouldEscalate(message, aiReply)) {
+    if (shouldEscalateNow) {
       const ticket = await Ticket.create({
         orgId,
         userId,
@@ -70,14 +114,16 @@ const sendMessage = async (req, res, next) => {
       emitToRole(orgId, "admin", "ticket:created", { ticketId: ticket._id, userId });
       emitToUser(userId, "ticket:created", { ticketId: ticket._id, status: ticket.status });
 
-      return created(res, "Ticket created", {
+      return res.status(201).json({ 
+        success: true, 
+        reply: "I'm connecting you with a support specialist who can better assist you.",
         ticketId: ticket._id,
-        response: "Your request has been routed to a support agent."
+        status: ticket.status
       });
     }
 
-    const responseText = aiReply || FALLBACK_MESSAGE;
-    return ok(res, "AI response", { response: responseText });
+    console.log("FINAL AI REPLY:", displayReply);
+    return res.status(200).json({ success: true, reply: displayReply });
   } catch (error) {
     return next(error);
   }

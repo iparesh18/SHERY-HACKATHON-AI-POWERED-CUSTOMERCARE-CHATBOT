@@ -1,12 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
-import { env } from "../config/env.js";
-
-const SYSTEM_PROMPT = "You are a helpful and professional AI customer support assistant.\n" +
-  "Your job is to answer general questions, respond to greetings, explain services or company information, and be helpful and friendly.\n" +
-  "Escalate ONLY if the user mentions payment or refund issues, order-related problems, login or account issues, technical errors or bugs, or is angry or frustrated.\n" +
-  "If you can answer, always answer. Do not escalate unnecessarily.\n" +
-  "If unsure, give a general helpful answer and do not escalate.\n" +
-  "If escalation is required, respond ONLY with: ESCALATE_TO_AGENT";
+import { getGeminiReply } from "./gemini.service.js";
+import { getGroqReply } from "./groq.service.js";
 
 const FALLBACK_MESSAGE = "Hi! How can I help you today?";
 const DEFAULT_SUGGESTIONS = [
@@ -15,32 +9,24 @@ const DEFAULT_SUGGESTIONS = [
   "I can help with that. Let me check and I will get back shortly."
 ];
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY
-});
-
 const getAIReply = async (message) => {
   try {
-    if (!process.env.GEMINI_API_KEY) {
-      return FALLBACK_MESSAGE;
+    if (process.env.USE_GROQ_ONLY === "true") {
+      console.log("AI MODE: GROQ ONLY (TEST)");
+      const reply = await getGroqReply(message);
+      console.log("AI RESPONSE FROM: GROQ");
+      return reply;
     }
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: message,
-      config: {
-        systemInstruction: SYSTEM_PROMPT
-      }
-    });
-
-    const text =
-      response?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      response?.response?.text?.();
-
-    return text?.trim() || FALLBACK_MESSAGE;
+    console.log("AI MODE: GEMINI PRIMARY");
+    const reply = await getGeminiReply(message);
+    console.log("AI RESPONSE FROM: GEMINI");
+    return reply?.trim() || FALLBACK_MESSAGE;
   } catch (error) {
-    console.error("Gemini error:", error?.message || error);
-    return FALLBACK_MESSAGE;
+    console.log("Gemini failed -> switching to Groq");
+    const reply = await getGroqReply(message);
+    console.log("AI RESPONSE FROM: GROQ (FALLBACK)");
+    return reply;
   }
 };
 
@@ -65,6 +51,10 @@ const getSuggestedReplies = async ({ issue, messages }) => {
     if (!process.env.GEMINI_API_KEY) {
       return DEFAULT_SUGGESTIONS;
     }
+
+    const ai = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY
+    });
 
     let prompt = `${SUGGESTION_PROMPT}\n\nIssue: ${issue}`;
     if (messages?.length) {

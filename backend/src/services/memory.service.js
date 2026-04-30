@@ -93,4 +93,74 @@ const getRelevantMemory = async ({ userId, message }) => {
   }
 };
 
-export { createEmbedding, saveMessageMemory, getRelevantMemory };
+const createMemory = async ({ id, content, namespace }) => {
+  try {
+    if (!content || typeof content !== "string" || !content.trim()) {
+      console.log("Skipping: empty memory content");
+      return false;
+    }
+
+    const embedding = await createEmbedding(content);
+    if (!embedding || !Array.isArray(embedding) || embedding.length === 0) {
+      console.log("Skipping: invalid embedding", embedding);
+      return false;
+    }
+
+    const index = getIndex();
+    if (!index) return false;
+
+    const vector = {
+      id: id || `${namespace}-${Date.now()}`,
+      values: embedding,
+      metadata: {
+        text: content,
+        userId: namespace,
+        createdAt: Date.now()
+      }
+    };
+
+    const payload = {
+      records: [vector],
+      namespace
+    };
+
+    console.log("Upserting memory:", vector.id, "length:", embedding.length);
+    console.log("Final upsert payload:", payload);
+
+    await index.upsert(payload);
+    return true;
+  } catch (err) {
+    console.log("Pinecone upsert error:", err?.message || err);
+    return false;
+  }
+};
+
+const queryMemory = async ({ query, limit = 5, namespace }) => {
+  try {
+    if (!query || typeof query !== "string" || !query.trim()) {
+      return [];
+    }
+
+    const vector = await createEmbedding(query);
+    if (!vector) return [];
+
+    const matches = await queryVectors({
+      vector,
+      topK: limit,
+      namespace
+    });
+
+    return Array.isArray(matches) ? matches : [];
+  } catch (error) {
+    console.error("Memory fetch error:", error?.message || error);
+    return [];
+  }
+};
+
+export {
+  createEmbedding,
+  saveMessageMemory,
+  getRelevantMemory,
+  createMemory,
+  queryMemory
+};

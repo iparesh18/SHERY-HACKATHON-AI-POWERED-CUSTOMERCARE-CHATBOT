@@ -50,15 +50,17 @@ const Chat = () => {
 
     try {
       const response = await sendMessage(text);
-      const payload = response.data?.data;
+      const payload = response.data || {};
+      // ticket created (201) or backend explicitly returned ticketId
       if (response.status === 201 || payload?.ticketId) {
         setMessages((prev) => [
           ...prev,
           { sender: "system", text: "Your issue has been escalated to support." }
         ]);
       }
-      if (payload?.response) {
-        setMessages((prev) => [...prev, { sender: "ai", text: payload.response }]);
+      // main AI reply now comes in `reply`
+      if (payload?.reply) {
+        setMessages((prev) => [...prev, { sender: "ai", text: payload.reply }]);
       }
     } catch (error) {
       pushToast(error?.response?.data?.message || "Message failed", "error");
