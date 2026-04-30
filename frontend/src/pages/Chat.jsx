@@ -56,11 +56,32 @@ const Chat = () => {
     socket.on("ticket:created", mergeTicketMeta);
     socket.on("ticket:status", mergeTicketMeta);
 
+    // helper to avoid duplicate consecutive messages
+    const appendMessageIfNew = (msg) => {
+      if (!msg || !msg.text) return;
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last && last.sender === msg.sender && last.text === msg.text) return prev;
+        return [...prev, msg];
+      });
+    };
+
+    // Also listen for live chat messages from server
+    const onChatMessage = (payload = {}) => {
+      if (!payload) return;
+      // Only append messages for this user
+      if (payload.userId && payload.userId !== user.id) return;
+      appendMessageIfNew({ sender: payload.sender || "ai", text: payload.text });
+    };
+
+    socket.on("chat:message", onChatMessage);
+
     return () => {
       socket.off("ticket:created", mergeTicketMeta);
       socket.off("ticket:status", mergeTicketMeta);
+      socket.off("chat:message", onChatMessage);
     };
-  }, [socket]);
+  }, [socket, user?.id]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -71,7 +92,12 @@ const Chat = () => {
 
     const text = input.trim();
     setInput("");
-    setMessages((prev) => [...prev, { sender: "user", text }]);
+    // append user message but avoid duplicates
+    setMessages((prev) => {
+      const last = prev[prev.length - 1];
+      if (last && last.sender === "user" && last.text === text) return prev;
+      return [...prev, { sender: "user", text }];
+    });
     setSending(true);
 
     try {
@@ -90,7 +116,12 @@ const Chat = () => {
       }
       // main AI reply now comes in `reply`
       if (payload?.reply) {
-        setMessages((prev) => [...prev, { sender: "ai", text: payload.reply }]);
+        // rely on appendMessageIfNew via socket or dedupe here
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.sender === "ai" && last.text === payload.reply) return prev;
+          return [...prev, { sender: "ai", text: payload.reply }];
+        });
       }
     } catch (error) {
       pushToast(error?.response?.data?.message || "Message failed", "error");

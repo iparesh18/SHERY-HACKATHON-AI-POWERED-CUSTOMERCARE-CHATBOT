@@ -122,7 +122,7 @@ const Tickets = () => {
   return (
     <div className="space-y-6">
       <div className="glass-card rounded-2xl p-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-4">
           <div>
             <h3 className="text-xl font-semibold">Ticket board</h3>
             <p className="text-sm text-muted">Open, in-progress, and resolved requests.</p>
@@ -148,15 +148,15 @@ const Tickets = () => {
         <div className="grid gap-4 xl:grid-cols-2">
           {tickets.map((ticket) => (
             <TicketCard key={ticket._id} ticket={ticket}>
-              <Link to={`/app/tickets/${ticket._id}`}>
-                <Button variant="ghost">View</Button>
+              <Link to={`/app/tickets/${ticket._id}`} className="w-full sm:w-auto">
+                <Button className="w-full" variant="ghost">View</Button>
               </Link>
               {user.role === "agent" && !ticket.assignedTo && ticket.status === "open" && (
-                <Button onClick={() => handleTake(ticket._id)}>Take Ticket</Button>
+                <Button className="w-full sm:w-auto" onClick={() => handleTake(ticket._id)}>Take Ticket</Button>
               )}
               {user.role === "admin" && (
-                <div className="flex flex-wrap gap-2">
-                  <div className="min-w-[220px] flex-1">
+                <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full mt-2 sm:mt-0">
+                  <div className="w-full sm:min-w-[220px] flex-1">
                     <label className="block text-xs text-white/70">Assign by name or email</label>
                     <input
                       placeholder="Start typing agent name or email"
@@ -179,11 +179,11 @@ const Tickets = () => {
                       </select>
                     )}
                   </div>
-                  <Button variant="outline" onClick={() => handleAssign(ticket._id)}>
+                  <Button className="w-full sm:w-auto mt-2 sm:mt-0" variant="outline" onClick={() => handleAssign(ticket._id)}>
                     {ticket.assignedTo ? "Re-assign" : "Assign"}
                   </Button>
                   {ticket.status === "resolved" && (
-                    <Button variant="danger" onClick={() => handleDelete(ticket._id)}>
+                    <Button className="w-full sm:w-auto" variant="danger" onClick={() => handleDelete(ticket._id)}>
                       Delete
                     </Button>
                   )}

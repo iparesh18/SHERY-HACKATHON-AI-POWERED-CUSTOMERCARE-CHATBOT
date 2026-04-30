@@ -1,5 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
-
 const SYSTEM_PROMPT = `You are a helpful and professional AI customer support assistant.
 
 IMPORTANT ESCALATION RULES:
@@ -11,12 +9,15 @@ IMPORTANT ESCALATION RULES:
 
 Always prioritize user safety and satisfaction. When in doubt, escalate to a human agent by responding with exactly: ESCALATE_TO_AGENT`;
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY
-});
-
 const getGeminiReply = async (message) => {
   try {
+    if (!process.env.GEMINI_API_KEY) {
+      console.log("GEMINI_API_KEY not set, skipping GEMINI provider");
+      throw new Error("GEMINI_API_KEY not configured");
+    }
+
+    const { GoogleGenAI } = await import("@google/genai");
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     console.log("Calling GEMINI API with model: gemini-2.5-flash");
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",

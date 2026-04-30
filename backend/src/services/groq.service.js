@@ -2,13 +2,15 @@ import Groq from "groq-sdk";
 
 const FALLBACK_MESSAGE = "Hi! How can I help you today?";
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
-
 const getGroqReply = async (message) => {
   try {
+    if (!process.env.GROQ_API_KEY) {
+      console.log("GROQ_API_KEY not set, skipping GROQ provider");
+      return FALLBACK_MESSAGE;
+    }
+
     console.log("Calling GROQ API");
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
     const response = await groq.chat.completions.create({
       messages: [

@@ -52,18 +52,31 @@ const TicketDetail = () => {
   useEffect(() => {
     if (!socket) return undefined;
 
-    const refresh = (payload) => {
-      if (payload?.ticketId === id) {
+    const onTicketMessage = (payload = {}) => {
+      if (!payload || payload.ticketId !== id) return;
+      if (payload.text) {
+        setTicket((prev) => {
+          if (!prev) return prev;
+          return { ...prev, messages: [...(prev.messages || []), { sender: payload.sender || "agent", text: payload.text }] };
+        });
+      } else {
+        // fallback to full refresh when payload doesn't include message text
         fetchTicket();
       }
     };
 
-    socket.on("ticket:message", refresh);
-    socket.on("ticket:status", refresh);
+    const onTicketStatus = (payload = {}) => {
+      if (!payload || payload.ticketId !== id) return;
+      setStatus(payload.status || "");
+      setTicket((prev) => (prev ? { ...prev, status: payload.status || prev.status } : prev));
+    };
+
+    socket.on("ticket:message", onTicketMessage);
+    socket.on("ticket:status", onTicketStatus);
 
     return () => {
-      socket.off("ticket:message", refresh);
-      socket.off("ticket:status", refresh);
+      socket.off("ticket:message", onTicketMessage);
+      socket.off("ticket:status", onTicketStatus);
     };
   }, [socket, id]);
 
@@ -148,28 +161,28 @@ const TicketDetail = () => {
         </p>
       )}
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_auto]">
+      <div className="mt-5 flex flex-col lg:grid gap-4 lg:grid-cols-[1fr_auto]">
         <Input
           placeholder="Send a reply"
           value={reply}
           onChange={(event) => setReply(event.target.value)}
           disabled={agentLocked}
         />
-        <Button onClick={handleReply} disabled={agentLocked}>Reply</Button>
+        <Button className="w-full lg:w-auto" onClick={handleReply} disabled={agentLocked}>Reply</Button>
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center gap-3">
+      <div className="mt-5 flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3">
         <select
           value={status}
           onChange={(event) => setStatus(event.target.value)}
-          className="select-field"
+          className="select-field w-full sm:w-auto"
           disabled={agentLocked}
         >
           <option value="open" className="select-option">Open</option>
           <option value="in-progress" className="select-option">In Progress</option>
           <option value="resolved" className="select-option">Resolved</option>
         </select>
-        <Button variant="outline" onClick={handleStatus} disabled={agentLocked}>
+        <Button className="w-full sm:w-auto" variant="outline" onClick={handleStatus} disabled={agentLocked}>
           Update status
         </Button>
       </div>

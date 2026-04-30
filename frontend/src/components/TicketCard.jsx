@@ -18,7 +18,7 @@ const TicketCard = ({ ticket, children }) => {
           Assigned: {ticket.assignedTo ? shortId(ticket.assignedTo) : "Unassigned"}
         </span>
       </div>
-      {children && <div className="mt-4 flex flex-wrap gap-2">{children}</div>}
+      {children && <div className="mt-4 flex flex-col sm:flex-row flex-wrap gap-2">{children}</div>}
     </div>
   );
 };

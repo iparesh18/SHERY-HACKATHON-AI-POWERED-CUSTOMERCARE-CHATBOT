@@ -6,7 +6,7 @@ import { useAuth } from "../hooks/useAuth.js";
 import { useToast } from "../hooks/useToast.js";
 import { createInvite, deleteInvite, listInvites } from "../services/org.service.js";
 
-const Sidebar = () => {
+const Sidebar = ({ isOpen, onClose }) => {
   const { user } = useAuth();
   const { pushToast } = useToast();
   const [inviteEmail, setInviteEmail] = useState("");
@@ -72,9 +72,17 @@ const Sidebar = () => {
   const closeInvites = () => setShowInvites(false);
 
   return (
-    <aside className="glass-card flex h-full flex-col rounded-3xl p-6">
-      <div>
-        <p className="text-xs uppercase tracking-[0.4em] text-white/40">Support Atlas</p>
+    <>
+      {isOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-black/60 lg:hidden transition-opacity duration-200" 
+          onClick={onClose}
+          aria-label="Close sidebar"
+        />
+      )}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-[280px] h-[100dvh] overflow-y-auto transform transition-transform duration-200 ease-in-out ${isOpen ? "translate-x-0" : "-translate-x-full"} lg:static lg:translate-x-0 lg:w-full lg:h-full lg:z-auto glass-card flex flex-col rounded-none lg:rounded-3xl p-6`}>
+        <div>
+          <p className="text-xs uppercase tracking-[0.4em] text-white/40">Support Atlas</p>
         <h1 className="mt-3 text-2xl font-semibold">AI Support Hub</h1>
       </div>
       <nav className="mt-10 flex flex-col gap-3 text-sm">
@@ -201,6 +209,7 @@ const Sidebar = () => {
         </div>
       )}
     </aside>
+    </>
   );
 };
 

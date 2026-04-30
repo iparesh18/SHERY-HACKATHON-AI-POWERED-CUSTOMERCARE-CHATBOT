@@ -148,7 +148,7 @@ const AdminDashboard = () => {
           </div>
         </div>
         {analytics ? (
-          <div className="mt-4 grid gap-4 lg:grid-cols-4">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <p className="text-xs text-muted">Total</p>
               <p className="mt-2 text-2xl font-semibold">{analytics.total}</p>
@@ -171,8 +171,9 @@ const AdminDashboard = () => {
         )}
 
         {analytics?.daily && analytics.daily.length > 0 && (
-          <div className="mt-6 grid grid-cols-7 gap-2">
-            {analytics.daily.map((day) => (
+          <div className="mt-6 overflow-x-auto pb-2">
+            <div className="grid min-w-[320px] grid-cols-7 gap-2">
+              {analytics.daily.map((day) => (
               <div key={day.date} className="flex flex-col items-center gap-2">
                 <div className="h-24 w-full rounded-full bg-white/10">
                   <div
@@ -184,12 +185,13 @@ const AdminDashboard = () => {
                 <span className="text-[10px] text-white/50">{day.date.slice(5)}</span>
               </div>
             ))}
+            </div>
           </div>
         )}
       </div>
 
       <div className="glass-card rounded-2xl p-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-4">
           <div>
             <h3 className="text-xl font-semibold">Admin control center</h3>
             <p className="text-sm text-muted">Assign tickets and track agent progress.</p>
@@ -213,8 +215,8 @@ const AdminDashboard = () => {
         <div className="grid gap-4 xl:grid-cols-2">
           {tickets.map((ticket) => (
             <TicketCard key={ticket._id} ticket={ticket}>
-              <div className="flex flex-wrap gap-2">
-                <div className="min-w-[220px] flex-1">
+              <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full">
+                <div className="w-full sm:min-w-[220px] flex-1">
                   <label className="block text-xs text-white/70">Assign by name or email</label>
                   <input
                     placeholder="Start typing agent name or email"
@@ -237,22 +239,22 @@ const AdminDashboard = () => {
                     </select>
                   )}
                 </div>
-                <Button variant="outline" onClick={() => handleAssign(ticket._id)}>
+                <Button className="w-full sm:w-auto mt-2 sm:mt-0" variant="outline" onClick={() => handleAssign(ticket._id)}>
                   {ticket.assignedTo ? "Re-assign" : "Assign"}
                 </Button>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="ghost" onClick={() => handleStatus(ticket._id, "open")}>
+              <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full mt-2 sm:mt-0">
+                <Button className="w-full sm:w-auto" variant="ghost" onClick={() => handleStatus(ticket._id, "open")}>
                   Open
                 </Button>
-                <Button variant="ghost" onClick={() => handleStatus(ticket._id, "in-progress")}>
+                <Button className="w-full sm:w-auto" variant="ghost" onClick={() => handleStatus(ticket._id, "in-progress")}>
                   In Progress
                 </Button>
-                <Button variant="ghost" onClick={() => handleStatus(ticket._id, "resolved")}>
+                <Button className="w-full sm:w-auto" variant="ghost" onClick={() => handleStatus(ticket._id, "resolved")}>
                   Resolve
                 </Button>
                 {ticket.status === "resolved" && (
-                  <Button variant="danger" onClick={() => handleDelete(ticket._id)}>
+                  <Button className="w-full sm:w-auto" variant="danger" onClick={() => handleDelete(ticket._id)}>
                     Delete
                   </Button>
                 )}
