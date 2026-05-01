@@ -6,6 +6,7 @@ import { createMemory, queryMemory } from "../services/memory.service.js";
 import { getCache, setCache } from "../services/cache.service.js";
 import { shouldEscalate } from "../utils/decisionEngine.js";
 import { emitToUser, emitToRole } from "../sockets/index.js";
+import { analyzeSentimentWithGroq } from "../services/sentiment.service.js";
 
 const sendMessage = async (req, res, next) => {
   try {
@@ -124,13 +125,17 @@ Answer clearly and naturally.`;
     }
 
     if (shouldEscalateNow) {
+      // Analyze sentiment of the user's problem
+      const sentiment = await analyzeSentimentWithGroq(message);
+
       const ticket = await Ticket.create({
         orgId,
         userId,
         issue: message,
         status: "open",
         assignedTo: null,
-        messages: [{ sender: "user", text: message }]
+        messages: [{ sender: "user", text: message }],
+        sentiment
       });
 
       // mark chat as escalated and save the escalation reply
@@ -142,11 +147,9 @@ Answer clearly and naturally.`;
       }
       await chat.save();
 
-      emitToUser(userId, "chat:message", {
-        sender: "ai",
-        text: escalationReply,
-        userId
-      });
+      // The HTTP response already returns the escalation reply to the requester.
+      // Avoid emitting a duplicate `chat:message` to the same user socket to
+      // prevent the client from receiving the same AI message twice.
 
       emitToRole(orgId, "agent", "ticket:created", { ticketId: ticket._id, userId });
       emitToRole(orgId, "admin", "ticket:created", { ticketId: ticket._id, userId });

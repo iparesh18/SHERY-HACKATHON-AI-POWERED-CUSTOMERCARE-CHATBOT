@@ -27,7 +27,8 @@ const ticketSchema = new mongoose.Schema(
     messages: [ticketMessageSchema],
     customerRating: { type: Number, min: 1, max: 5, default: null },
     ratingText: { type: String, default: null },
-    ratedAt: { type: Date, default: null }
+    ratedAt: { type: Date, default: null },
+    sentiment: { type: String, enum: ["happy", "neutral", "frustrated"], default: null }
   },
   { timestamps: true }
 );
