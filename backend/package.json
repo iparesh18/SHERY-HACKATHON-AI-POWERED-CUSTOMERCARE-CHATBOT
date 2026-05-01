@@ -6,12 +6,16 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
+    "start": "node server.js",
+    "start:pm2": "pm2 start ecosystem.config.cjs",
+    "stop:pm2": "pm2 stop ai-support-backend",
+    "restart:pm2": "pm2 restart ai-support-backend"
   },
   "dependencies": {
     "@google/genai": "^1.50.1",
     "@google/generative-ai": "^0.15.0",
     "@pinecone-database/pinecone": "^7.2.0",
+    "@socket.io/redis-adapter": "^8.3.0",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
@@ -23,6 +27,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.4.1",
     "morgan": "^1.10.0",
+    "redis": "^5.12.1",
     "socket.io": "^4.7.5"
   },
   "devDependencies": {

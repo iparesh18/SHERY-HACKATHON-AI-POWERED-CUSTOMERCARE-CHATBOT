@@ -23,6 +23,7 @@ const sendMessage = async (req, res, next) => {
       { new: true, upsert: true }
     );
 
+    // append user message immediately
     chat.messages.push({ sender: "user", text: message });
     emitToUser(userId, "chat:message", {
       sender: "user",
@@ -90,20 +91,17 @@ Answer clearly and naturally.`;
     let aiReply = await getAIReply(finalPrompt);
     if (!aiReply) aiReply = FALLBACK_MESSAGE;
     console.log("AI RESPONSE:", aiReply);
-    
+
     // Check if AI wants to escalate
     const shouldEscalateNow = aiReply?.trim() === "ESCALATE_TO_AGENT" || shouldEscalate(message, aiReply);
-    
-    // Use friendly message for escalation or actual AI reply
-    const displayReply = shouldEscalateNow && aiReply?.trim() === "ESCALATE_TO_AGENT" 
-      ? "I'm connecting you with a support specialist who can better assist you."
-      : aiReply;
+    const escalationReply = "I'm connecting you with a support specialist who can better assist you.";
 
     // Only save non-escalation AI responses to chat history and memory
-    if (!shouldEscalateNow || aiReply?.trim() !== "ESCALATE_TO_AGENT") {
+    if (!shouldEscalateNow) {
+      const displayReply = aiReply;
       chat.messages.push({ sender: "ai", text: displayReply });
       await chat.save();
-      
+
       emitToUser(userId, "chat:message", {
         sender: "ai",
         text: displayReply,
@@ -119,6 +117,10 @@ Answer clearly and naturally.`;
       } catch (error) {
         console.error("Memory save error:", error?.message || error);
       }
+
+      await setCache(cacheKey, displayReply, 60);
+      console.log("FINAL AI REPLY:", displayReply);
+      return res.status(200).json({ success: true, reply: displayReply });
     }
 
     if (shouldEscalateNow) {
@@ -131,12 +133,18 @@ Answer clearly and naturally.`;
         messages: [{ sender: "user", text: message }]
       });
 
-      chat.messages.push({ sender: "ai", text: displayReply });
+      // mark chat as escalated and save the escalation reply
+      chat.escalated = true;
+      chat.escalatedTicketId = ticket._id;
+      const lastMessage = chat.messages[chat.messages.length - 1];
+      if (!(lastMessage && lastMessage.sender === "ai" && lastMessage.text === escalationReply)) {
+        chat.messages.push({ sender: "ai", text: escalationReply });
+      }
       await chat.save();
 
       emitToUser(userId, "chat:message", {
         sender: "ai",
-        text: displayReply,
+        text: escalationReply,
         userId
       });
 
@@ -146,16 +154,11 @@ Answer clearly and naturally.`;
 
       return res.status(201).json({ 
         success: true, 
-        reply: "I'm connecting you with a support specialist who can better assist you.",
+        reply: escalationReply,
         ticketId: ticket._id,
         status: ticket.status
       });
     }
-
-    await setCache(cacheKey, displayReply, 60);
-
-    console.log("FINAL AI REPLY:", displayReply);
-    return res.status(200).json({ success: true, reply: displayReply });
   } catch (error) {
     return next(error);
   }
@@ -170,6 +173,25 @@ const getThread = async (req, res, next) => {
     }
 
     const chat = await ChatThread.findOne({ userId, orgId: req.user.orgId });
+    if (chat?.messages?.length) {
+      const dedupedMessages = [];
+      for (const currentMessage of chat.messages) {
+        const previousMessage = dedupedMessages[dedupedMessages.length - 1];
+        if (
+          previousMessage &&
+          previousMessage.sender === currentMessage.sender &&
+          previousMessage.text === currentMessage.text
+        ) {
+          continue;
+        }
+        dedupedMessages.push(currentMessage);
+      }
+
+      if (dedupedMessages.length !== chat.messages.length) {
+        chat.messages = dedupedMessages;
+        await chat.save();
+      }
+    }
     return ok(res, "Chat thread", { thread: chat });
   } catch (error) {
     return next(error);

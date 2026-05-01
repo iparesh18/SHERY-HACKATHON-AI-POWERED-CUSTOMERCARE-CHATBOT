@@ -22,6 +22,12 @@ const chatThreadSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Track escalation state so frontend can persist escalated reply until resolved
+chatThreadSchema.add({
+  escalated: { type: Boolean, default: false },
+  escalatedTicketId: { type: mongoose.Schema.Types.ObjectId, ref: "Ticket", default: null }
+});
+
 const ChatThread = mongoose.model("ChatThread", chatThreadSchema);
 
 export { ChatThread };

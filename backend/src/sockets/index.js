@@ -1,7 +1,41 @@
 import jwt from "jsonwebtoken";
+import { createClient } from "redis";
+import { createAdapter } from "@socket.io/redis-adapter";
 import { env } from "../config/env.js";
 
 let ioInstance = null;
+let adapterSetupPromise = null;
+
+const buildRedisUrl = () => {
+  const host = env.redisHost || "127.0.0.1";
+  const port = Number(env.redisPort || 6379);
+  const auth = env.redisPassword ? `:${encodeURIComponent(env.redisPassword)}@` : "";
+
+  return `redis://${auth}${host}:${port}`;
+};
+
+const setupRedisAdapter = async (io) => {
+  if (!env.redisHost && !env.redisPassword) {
+    console.warn("Socket.IO Redis adapter skipped: REDIS_HOST not configured");
+    return;
+  }
+
+  const redisUrl = buildRedisUrl();
+  const pubClient = createClient({ url: redisUrl });
+  const subClient = pubClient.duplicate();
+
+  pubClient.on("error", (error) => {
+    console.error("Socket.IO Redis pub client error:", error?.message || error);
+  });
+
+  subClient.on("error", (error) => {
+    console.error("Socket.IO Redis sub client error:", error?.message || error);
+  });
+
+  await Promise.all([pubClient.connect(), subClient.connect()]);
+  io.adapter(createAdapter(pubClient, subClient));
+  console.log("Socket.IO Redis adapter enabled");
+};
 
 const getTokenFromSocket = (socket) => {
   const header = socket.handshake.headers?.authorization || "";
@@ -12,8 +46,16 @@ const getTokenFromSocket = (socket) => {
   return socket.handshake.auth?.token || null;
 };
 
-const initSockets = (io) => {
+const initSockets = async (io) => {
   ioInstance = io;
+
+  if (!adapterSetupPromise) {
+    adapterSetupPromise = setupRedisAdapter(io).catch((error) => {
+      console.error("Socket.IO Redis adapter failed:", error?.message || error);
+    });
+  }
+
+  await adapterSetupPromise;
 
   io.on("connection", (socket) => {
     try {

@@ -119,6 +119,13 @@ const updateStatus = async (req, res, next) => {
     ticket.status = status;
     await ticket.save();
 
+    if (status === "resolved") {
+      await ChatThread.updateOne(
+        { userId: ticket.userId, orgId: ticket.orgId },
+        { $set: { escalated: false, escalatedTicketId: null } }
+      );
+    }
+
     emitToUser(ticket.userId?.toString(), "ticket:status", {
       ticketId: ticket._id,
       status: ticket.status

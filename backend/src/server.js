@@ -23,9 +23,13 @@ initSockets(io);
 
 const startServer = async () => {
   await connectDb();
+  await initSockets(io);
 
-  server.listen(env.port, () => {
-    console.log(`Server running on port ${env.port}`);
+  const PORT = process.env.PORT || env.port || 5000;
+
+  server.listen(PORT, () => {
+    console.log("Server running on PID:", process.pid);
+    console.log(`Server running on port ${PORT}`);
   });
 };
 
