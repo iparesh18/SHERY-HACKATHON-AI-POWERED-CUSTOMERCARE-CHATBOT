@@ -173,6 +173,21 @@ const getThread = async (req, res, next) => {
     }
 
     const chat = await ChatThread.findOne({ userId, orgId: req.user.orgId });
+    let escalatedTicketStatus = null;
+    let escalatedTicketRating = null;
+
+    if (chat?.escalatedTicketId) {
+      const ticket = await Ticket.findOne({
+        _id: chat.escalatedTicketId,
+        orgId: req.user.orgId
+      }).select("status customerRating");
+
+      if (ticket) {
+        escalatedTicketStatus = ticket.status;
+        escalatedTicketRating = ticket.customerRating;
+      }
+    }
+
     if (chat?.messages?.length) {
       const dedupedMessages = [];
       for (const currentMessage of chat.messages) {
@@ -192,7 +207,13 @@ const getThread = async (req, res, next) => {
         await chat.save();
       }
     }
-    return ok(res, "Chat thread", { thread: chat });
+    const thread = chat?.toObject ? chat.toObject() : chat;
+    if (thread) {
+      thread.escalatedTicketStatus = escalatedTicketStatus;
+      thread.escalatedTicketRating = escalatedTicketRating;
+    }
+
+    return ok(res, "Chat thread", { thread });
   } catch (error) {
     return next(error);
   }

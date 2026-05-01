@@ -1,4 +1,5 @@
 import Badge from "./Badge.jsx";
+import { RatingBadge } from "./RatingBadge.jsx";
 import { formatRelative, shortId } from "../utils/format.js";
 
 const TicketCard = ({ ticket, children }) => {
@@ -10,7 +11,10 @@ const TicketCard = ({ ticket, children }) => {
           <h3 className="mt-2 text-lg font-semibold">{ticket.issue}</h3>
           <p className="mt-2 text-xs text-muted">ID: {shortId(ticket._id)}</p>
         </div>
-        <Badge label={ticket.status} tone={ticket.status} />
+        <div className="flex flex-col items-end gap-2">
+          <Badge label={ticket.status} tone={ticket.status} />
+          {ticket.customerRating && <RatingBadge rating={ticket.customerRating} />}
+        </div>
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-muted">
         <span>Created {formatRelative(ticket.createdAt)}</span>

@@ -35,11 +35,11 @@ const Tickets = () => {
     }
   };
 
-  // Create debounced refresh function (only once)
+  // Create debounced refresh function (instant for real-time experience)
   useEffect(() => {
     debouncedRefreshRef.current = debounce(() => {
       fetchTickets();
-    }, 500);
+    }, 100);
   }, []);
 
   useEffect(() => {
@@ -70,12 +70,13 @@ const Tickets = () => {
 
     const handleRefresh = () => debouncedRefreshRef.current();
 
-    // Listen to all ticket events
+    // Listen to all ticket events for real-time updates
     socket.on("ticket:created", handleRefresh);
     socket.on("ticket:assigned", handleRefresh);
     socket.on("ticket:status", handleRefresh);
     socket.on("ticket:message", handleRefresh);
     socket.on("ticket:deleted", handleRefresh);
+    socket.on("ticket:rated", handleRefresh);
 
     return () => {
       socket.off("ticket:created", handleRefresh);
@@ -83,6 +84,7 @@ const Tickets = () => {
       socket.off("ticket:status", handleRefresh);
       socket.off("ticket:message", handleRefresh);
       socket.off("ticket:deleted", handleRefresh);
+      socket.off("ticket:rated", handleRefresh);
     };
   }, [socket]);
 

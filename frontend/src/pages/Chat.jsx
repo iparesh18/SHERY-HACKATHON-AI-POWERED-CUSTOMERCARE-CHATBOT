@@ -3,6 +3,7 @@ import Button from "../components/Button.jsx";
 import ChatMessage from "../components/ChatMessage.jsx";
 import SkeletonMessage from "../components/SkeletonMessage.jsx";
 import Input from "../components/Input.jsx";
+import { RatingModal } from "../components/RatingModal.jsx";
 import { useAuth } from "../hooks/useAuth.js";
 import { useSocket } from "../hooks/useSocket.js";
 import { useToast } from "../hooks/useToast.js";
@@ -17,6 +18,7 @@ const Chat = () => {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
   const bottomRef = useRef(null);
 
   const canSend = useMemo(() => input.trim().length > 0 && !sending, [input, sending]);
@@ -27,6 +29,13 @@ const Chat = () => {
       const response = await getChat(user.id);
       const thread = response.data?.data?.thread;
       setMessages(thread?.messages || []);
+      if (thread?.escalatedTicketId) {
+        setTicketMeta({
+          ticketId: thread.escalatedTicketId,
+          status: thread.escalatedTicketStatus || (thread.escalated ? "open" : undefined),
+          customerRating: thread.escalatedTicketRating || null
+        });
+      }
     } catch (error) {
       pushToast(error?.response?.data?.message || "Failed to load chat", "error");
     } finally {
@@ -74,14 +83,27 @@ const Chat = () => {
       appendMessageIfNew({ sender: payload.sender || "ai", text: payload.text });
     };
 
+    // Listen for rating submissions
+    const onTicketRated = (payload = {}) => {
+      if (!payload?.ticketId || payload.ticketId !== ticketMeta?.ticketId) return;
+      setTicketMeta((prev) => ({
+        ...prev,
+        customerRating: payload.rating,
+        ratingText: payload.ratingText
+      }));
+    };
+
     socket.on("chat:message", onChatMessage);
+    socket.on("ticket:rated", onTicketRated);
 
     return () => {
       socket.off("ticket:created", mergeTicketMeta);
       socket.off("ticket:status", mergeTicketMeta);
       socket.off("chat:message", onChatMessage);
+      socket.off("ticket:rated", onTicketRated);
     };
   }, [socket, user?.id]);
+
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -153,7 +175,12 @@ const Chat = () => {
         ) : (
           <div className="space-y-3">
             {messages.map((message, index) => (
-              <ChatMessage key={`${message.text}-${index}`} message={message} />
+              <ChatMessage
+                key={`${message.text}-${index}`}
+                message={message}
+                ticketMeta={ticketMeta}
+                onRate={() => setShowRatingModal(true)}
+              />
             ))}
             {sending && <SkeletonMessage lines={3} />}
             <div ref={bottomRef} />
@@ -179,6 +206,16 @@ const Chat = () => {
           {sending ? "Sending..." : "Send"}
         </Button>
       </div>
+
+      {showRatingModal && ticketMeta?.ticketId && (
+        <RatingModal
+          ticketId={ticketMeta.ticketId}
+          onClose={() => setShowRatingModal(false)}
+          onSuccess={() => {
+            pushToast("Rating submitted successfully!", "success");
+          }}
+        />
+      )}
     </div>
   );
 };

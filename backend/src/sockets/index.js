@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import { createClient } from "redis";
+import Redis from "ioredis";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { env } from "../config/env.js";
 
@@ -14,19 +14,45 @@ const buildRedisUrl = () => {
   const host = env.redisHost || "127.0.0.1";
   const port = Number(env.redisPort || 6379);
   const auth = env.redisPassword ? `:${encodeURIComponent(env.redisPassword)}@` : "";
-  const useTls = env.redisTls || host.includes("redislabs.com") || host.includes("redis.cloud");
+  const useTls = env.redisTls;
 
   return `${useTls ? "rediss" : "redis"}://${auth}${host}:${port}`;
 };
 
+const buildRedisOptions = () => {
+  const host = env.redisHost || "127.0.0.1";
+  const port = Number(env.redisPort || 6379);
+  const password = env.redisPassword || undefined;
+  const useTls = env.redisTls;
+
+  return {
+    host,
+    port,
+    password,
+    tls: useTls ? {} : undefined,
+    retryStrategy: (times) => Math.min(times * 200, 3000),
+    lazyConnect: true
+  };
+};
+
+const createRedisClient = () => {
+  if (env.redisUrl) {
+    return new Redis(buildRedisUrl(), {
+      retryStrategy: (times) => Math.min(times * 200, 3000),
+      lazyConnect: true
+    });
+  }
+
+  return new Redis(buildRedisOptions());
+};
+
 const setupRedisAdapter = async (io) => {
-  if (!env.redisHost && !env.redisPassword) {
+  if (!env.redisUrl && !env.redisHost) {
     console.warn("Socket.IO Redis adapter skipped: REDIS_HOST not configured");
     return;
   }
 
-  const redisUrl = buildRedisUrl();
-  const pubClient = createClient({ url: redisUrl });
+  const pubClient = createRedisClient();
   const subClient = pubClient.duplicate();
 
   pubClient.on("error", (error) => {

@@ -46,12 +46,12 @@ const AdminDashboard = () => {
     }
   };
 
-  // Create debounced refresh function (only once)
+  // Create debounced refresh function (instant for real-time experience)
   useEffect(() => {
     debouncedRefreshRef.current = debounce(() => {
       fetchTickets();
       fetchAnalytics();
-    }, 500);
+    }, 100);
   }, []);
 
   useEffect(() => {
@@ -89,6 +89,7 @@ const AdminDashboard = () => {
     socket.on("ticket:status", handleRefresh);
     socket.on("ticket:message", handleRefresh);
     socket.on("ticket:deleted", handleRefresh);
+  socket.on("ticket:rated", handleRefresh);
 
     return () => {
       socket.off("ticket:created", handleRefresh);
@@ -96,6 +97,7 @@ const AdminDashboard = () => {
       socket.off("ticket:status", handleRefresh);
       socket.off("ticket:message", handleRefresh);
       socket.off("ticket:deleted", handleRefresh);
+      socket.off("ticket:rated", handleRefresh);
     };
   }, [socket]);
 
@@ -177,6 +179,15 @@ const AdminDashboard = () => {
               <p className="text-xs text-muted">Resolved</p>
               <p className="mt-2 text-2xl font-semibold">{analytics.byStatus?.resolved || 0}</p>
             </div>
+            {analytics.csat && (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs text-muted">Avg CSAT</p>
+                <p className="mt-2 text-2xl font-semibold">
+                  {analytics.csat.avgRating} <span className="text-lg">★</span>
+                </p>
+                <p className="mt-1 text-xs text-white/50">{analytics.csat.totalRated} rated</p>
+              </div>
+            )}
           </div>
         ) : (
           <p className="mt-4 text-sm text-muted">Loading analytics...</p>

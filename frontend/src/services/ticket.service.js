@@ -9,6 +9,20 @@ const replyTicket = (id, message) => api.post(`/tickets/${id}/reply`, { message 
 const deleteTicket = (id) => api.delete(`/tickets/${id}`);
 const getTicketAnalytics = () => api.get("/tickets/analytics");
 const getTicketSuggestions = (id) => api.get(`/tickets/${id}/suggestions`);
+const submitFeedback = (id, data) => api.post(`/tickets/${id}/feedback`, data);
+
+const ticketService = {
+	getTickets,
+	getTicket,
+	takeTicket,
+	assignTicket,
+	updateStatus,
+	replyTicket,
+	deleteTicket,
+	getTicketAnalytics,
+	getTicketSuggestions,
+	submitFeedback
+};
 
 export {
 	getTickets,
@@ -19,5 +33,7 @@ export {
 	replyTicket,
 	deleteTicket,
 	getTicketAnalytics,
-	getTicketSuggestions
+	getTicketSuggestions,
+	submitFeedback,
+	ticketService
 };

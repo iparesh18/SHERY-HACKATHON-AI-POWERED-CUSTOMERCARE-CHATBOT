@@ -119,13 +119,6 @@ const updateStatus = async (req, res, next) => {
     ticket.status = status;
     await ticket.save();
 
-    if (status === "resolved") {
-      await ChatThread.updateOne(
-        { userId: ticket.userId, orgId: ticket.orgId },
-        { $set: { escalated: false, escalatedTicketId: null } }
-      );
-    }
-
     emitToUser(ticket.userId?.toString(), "ticket:status", {
       ticketId: ticket._id,
       status: ticket.status
@@ -273,7 +266,41 @@ const getAnalytics = async (req, res, next) => {
       return { date: key, count: dailyMap.get(key) || 0 };
     });
 
-    return ok(res, "Analytics", { total, byStatus, daily });
+    // CSAT Analytics
+    const ratedTicketsAgg = await Ticket.aggregate([
+      { $match: { orgId, customerRating: { $ne: null } } },
+      {
+        $group: {
+          _id: null,
+          avgRating: { $avg: "$customerRating" },
+          totalRated: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const ratingDistributionAgg = await Ticket.aggregate([
+      { $match: { orgId, customerRating: { $ne: null } } },
+      {
+        $group: {
+          _id: "$customerRating",
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    const ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    ratingDistributionAgg.forEach((item) => {
+      ratingDistribution[item._id] = item.count;
+    });
+
+    const csat = {
+      avgRating: ratedTicketsAgg.length > 0 ? ratedTicketsAgg[0].avgRating.toFixed(2) : 0,
+      totalRated: ratedTicketsAgg.length > 0 ? ratedTicketsAgg[0].totalRated : 0,
+      ratingDistribution
+    };
+
+    return ok(res, "Analytics", { total, byStatus, daily, csat });
   } catch (error) {
     return next(error);
   }
@@ -301,6 +328,51 @@ const getSuggestions = async (req, res, next) => {
   }
 };
 
+const submitRating = async (req, res, next) => {
+  try {
+    const { rating, ratingText } = req.body;
+    const ticketId = req.params.id;
+    const userId = req.user.id;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return fail(res, 400, "Rating must be between 1-5");
+    }
+
+    const ticket = await Ticket.findOneAndUpdate(
+      { _id: ticketId, userId },
+      {
+        customerRating: rating,
+        ratingText: ratingText?.trim() || null,
+        ratedAt: new Date()
+      },
+      { new: true }
+    );
+
+    if (!ticket) {
+      return fail(res, 404, "Ticket not found or unauthorized");
+    }
+
+    // Emit to agent and admin
+    if (ticket.assignedTo) {
+      emitToUser(ticket.assignedTo.toString(), "ticket:rated", {
+        ticketId: ticket._id,
+        rating,
+        ratingText: ratingText?.trim() || null
+      });
+    }
+    emitToRole(ticket.orgId?.toString(), "admin", "ticket:rated", {
+      ticketId: ticket._id,
+      rating,
+      ratingText: ratingText?.trim() || null,
+      userId
+    });
+
+    return ok(res, "Rating submitted", { ticket });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export {
   listTickets,
   getTicket,
@@ -310,5 +382,6 @@ export {
   replyToTicket,
   deleteTicket,
   getAnalytics,
-  getSuggestions
+  getSuggestions,
+  submitRating
 };

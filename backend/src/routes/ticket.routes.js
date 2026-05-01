@@ -9,7 +9,8 @@ import {
   replyToTicket,
   deleteTicket,
   getAnalytics,
-  getSuggestions
+  getSuggestions,
+  submitRating
 } from "../controllers/ticket.controller.js";
 import { authMiddleware } from "../middleware/auth.middleware.js";
 import { authorizeRoles } from "../middleware/role.middleware.js";
@@ -45,6 +46,14 @@ router.post(
   [body("message").notEmpty().isString()],
   validateRequest,
   replyToTicket
+);
+router.post(
+  "/:id/feedback",
+  authMiddleware,
+  authorizeRoles("customer"),
+  [body("rating").isInt({ min: 1, max: 5 }), body("ratingText").optional().isString()],
+  validateRequest,
+  submitRating
 );
 router.delete("/:id", authMiddleware, authorizeRoles("admin"), deleteTicket);
 

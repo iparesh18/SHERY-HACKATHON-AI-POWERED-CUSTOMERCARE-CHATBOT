@@ -5,7 +5,7 @@ const buildRedisOptions = () => {
   const host = env.redisHost;
   const port = Number(env.redisPort || 6379);
   const password = env.redisPassword || undefined;
-  const useTls = env.redisTls || host.includes("redislabs.com") || host.includes("redis.cloud");
+  const useTls = env.redisTls;
 
   return {
     host,
