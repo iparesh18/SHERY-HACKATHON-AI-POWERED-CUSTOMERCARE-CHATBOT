@@ -1,11 +1,24 @@
 import Redis from "ioredis";
+import { env } from "../config/env.js";
 
-const redis = new Redis({
-  host: process.env.REDIS_HOST,
-  port: Number(process.env.REDIS_PORT || 6379),
-  password: process.env.REDIS_PASSWORD,
-  retryStrategy: (times) => Math.min(times * 200, 3000)
-});
+const buildRedisOptions = () => {
+  const host = env.redisHost;
+  const port = Number(env.redisPort || 6379);
+  const password = env.redisPassword || undefined;
+  const useTls = env.redisTls || host.includes("redislabs.com") || host.includes("redis.cloud");
+
+  return {
+    host,
+    port,
+    password,
+    tls: useTls ? {} : undefined,
+    retryStrategy: (times) => Math.min(times * 200, 3000)
+  };
+};
+
+const redis = env.redisUrl
+  ? new Redis(env.redisUrl, { retryStrategy: (times) => Math.min(times * 200, 3000) })
+  : new Redis(buildRedisOptions());
 
 redis.on("connect", () => {
   console.log("Redis connected");

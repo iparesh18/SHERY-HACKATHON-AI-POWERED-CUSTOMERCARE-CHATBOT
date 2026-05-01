@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import Button from "../components/Button.jsx";
 import EmptyState from "../components/EmptyState.jsx";
@@ -9,6 +9,7 @@ import { useSocket } from "../hooks/useSocket.js";
 import { useToast } from "../hooks/useToast.js";
 import { assignTicket, deleteTicket, getTickets, takeTicket } from "../services/ticket.service.js";
 import { getAgents } from "../services/user.service.js";
+import { debounce } from "../utils/debounce.js";
 
 const Tickets = () => {
   const { user, token } = useAuth();
@@ -20,6 +21,7 @@ const Tickets = () => {
   const [agentQuery, setAgentQuery] = useState("");
   const [agentOptions, setAgentOptions] = useState([]);
   const [selectedAgentId, setSelectedAgentId] = useState("");
+  const debouncedRefreshRef = useRef(null);
 
   const fetchTickets = async () => {
     setLoading(true);
@@ -32,6 +34,13 @@ const Tickets = () => {
       setLoading(false);
     }
   };
+
+  // Create debounced refresh function (only once)
+  useEffect(() => {
+    debouncedRefreshRef.current = debounce(() => {
+      fetchTickets();
+    }, 500);
+  }, []);
 
   useEffect(() => {
     fetchTickets();
@@ -57,19 +66,25 @@ const Tickets = () => {
   }, [agentQuery]);
 
   useEffect(() => {
-    if (!socket) return undefined;
+    if (!socket || !debouncedRefreshRef.current) return undefined;
 
-    const refresh = () => fetchTickets();
-    socket.on("ticket:created", refresh);
-    socket.on("ticket:assigned", refresh);
-    socket.on("ticket:status", refresh);
+    const handleRefresh = () => debouncedRefreshRef.current();
+
+    // Listen to all ticket events
+    socket.on("ticket:created", handleRefresh);
+    socket.on("ticket:assigned", handleRefresh);
+    socket.on("ticket:status", handleRefresh);
+    socket.on("ticket:message", handleRefresh);
+    socket.on("ticket:deleted", handleRefresh);
 
     return () => {
-      socket.off("ticket:created", refresh);
-      socket.off("ticket:assigned", refresh);
-      socket.off("ticket:status", refresh);
+      socket.off("ticket:created", handleRefresh);
+      socket.off("ticket:assigned", handleRefresh);
+      socket.off("ticket:status", handleRefresh);
+      socket.off("ticket:message", handleRefresh);
+      socket.off("ticket:deleted", handleRefresh);
     };
-  }, [socket, statusFilter]);
+  }, [socket]);
 
   const handleTake = async (id) => {
     try {

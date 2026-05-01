@@ -7,11 +7,16 @@ let ioInstance = null;
 let adapterSetupPromise = null;
 
 const buildRedisUrl = () => {
+  if (env.redisUrl) {
+    return env.redisUrl;
+  }
+
   const host = env.redisHost || "127.0.0.1";
   const port = Number(env.redisPort || 6379);
   const auth = env.redisPassword ? `:${encodeURIComponent(env.redisPassword)}@` : "";
+  const useTls = env.redisTls || host.includes("redislabs.com") || host.includes("redis.cloud");
 
-  return `redis://${auth}${host}:${port}`;
+  return `${useTls ? "rediss" : "redis"}://${auth}${host}:${port}`;
 };
 
 const setupRedisAdapter = async (io) => {

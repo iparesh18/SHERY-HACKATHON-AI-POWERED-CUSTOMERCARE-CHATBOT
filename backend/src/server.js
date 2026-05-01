@@ -19,8 +19,6 @@ const io = new Server(server, {
   }
 });
 
-initSockets(io);
-
 const startServer = async () => {
   await connectDb();
   await initSockets(io);
