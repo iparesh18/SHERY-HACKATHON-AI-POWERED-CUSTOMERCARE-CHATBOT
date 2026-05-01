@@ -20,6 +20,7 @@ const Chat = () => {
   const [sending, setSending] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const bottomRef = useRef(null);
+  const ticketMetaRef = useRef(null);
 
   const canSend = useMemo(() => input.trim().length > 0 && !sending, [input, sending]);
 
@@ -48,6 +49,10 @@ const Chat = () => {
       loadThread();
     }
   }, [user?.id]);
+
+  useEffect(() => {
+    ticketMetaRef.current = ticketMeta;
+  }, [ticketMeta]);
 
   useEffect(() => {
     if (!socket) return undefined;
@@ -85,7 +90,8 @@ const Chat = () => {
 
     // Listen for rating submissions
     const onTicketRated = (payload = {}) => {
-      if (!payload?.ticketId || payload.ticketId !== ticketMeta?.ticketId) return;
+      const currentTicketId = ticketMetaRef.current?.ticketId;
+      if (!payload?.ticketId || payload.ticketId !== currentTicketId) return;
       setTicketMeta((prev) => ({
         ...prev,
         customerRating: payload.rating,
@@ -211,7 +217,12 @@ const Chat = () => {
         <RatingModal
           ticketId={ticketMeta.ticketId}
           onClose={() => setShowRatingModal(false)}
-          onSuccess={() => {
+          onSuccess={({ rating, ratingText } = {}) => {
+            setTicketMeta((prev) => ({
+              ...(prev || {}),
+              customerRating: rating,
+              ratingText
+            }));
             pushToast("Rating submitted successfully!", "success");
           }}
         />

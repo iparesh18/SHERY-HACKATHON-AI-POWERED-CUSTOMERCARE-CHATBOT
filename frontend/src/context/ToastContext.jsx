@@ -1,13 +1,15 @@
-import { createContext, useCallback, useMemo, useState } from "react";
+import { createContext, useCallback, useMemo, useRef, useState } from "react";
 import ToastStack from "../components/Toast.jsx";
 
 const ToastContext = createContext(null);
 
 const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
+  const toastIdRef = useRef(0);
 
   const pushToast = useCallback((message, tone = "info") => {
-    const id = Date.now();
+    toastIdRef.current += 1;
+    const id = `${Date.now()}-${toastIdRef.current}`;
     setToasts((prev) => [...prev, { id, message, tone }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((toast) => toast.id !== id));

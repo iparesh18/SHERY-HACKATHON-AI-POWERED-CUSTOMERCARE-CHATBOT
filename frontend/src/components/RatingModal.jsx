@@ -18,7 +18,7 @@ export const RatingModal = ({ ticketId, onClose, onSuccess }) => {
     try {
       await ticketService.submitFeedback(ticketId, { rating, ratingText: feedback });
       pushToast("Thank you for your feedback!", "success");
-      onSuccess?.();
+      onSuccess?.({ rating, ratingText: feedback });
       onClose();
     } catch (error) {
       pushToast(error?.response?.data?.message || "Failed to submit feedback", "error");
