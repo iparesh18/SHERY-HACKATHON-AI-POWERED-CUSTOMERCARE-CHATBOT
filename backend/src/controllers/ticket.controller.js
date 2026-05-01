@@ -179,6 +179,13 @@ const replyToTicket = async (req, res, next) => {
       text: message
     });
 
+    // Also emit as chat:message so customer sees it in Chat page instantly
+    emitToUser(ticket.userId?.toString(), "chat:message", {
+      sender: "agent",
+      text: message,
+      userId: ticket.userId?.toString()
+    });
+
     if (ticket.assignedTo) {
       emitToUser(ticket.assignedTo.toString(), "ticket:message", {
         ticketId: ticket._id,

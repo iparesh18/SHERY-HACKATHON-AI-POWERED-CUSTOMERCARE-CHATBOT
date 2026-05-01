@@ -69,8 +69,8 @@ const Chat = () => {
     // Also listen for live chat messages from server
     const onChatMessage = (payload = {}) => {
       if (!payload) return;
-      // Only append messages for this user
-      if (payload.userId && payload.userId !== user.id) return;
+      // Only append messages for this user - compare as strings to handle ObjectId vs string
+      if (payload.userId && payload.userId !== user.id?.toString()) return;
       appendMessageIfNew({ sender: payload.sender || "ai", text: payload.text });
     };
 
