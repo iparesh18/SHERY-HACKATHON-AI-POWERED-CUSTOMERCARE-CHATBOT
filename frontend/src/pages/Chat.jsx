@@ -9,6 +9,15 @@ import { useSocket } from "../hooks/useSocket.js";
 import { useToast } from "../hooks/useToast.js";
 import { getChat, sendMessage } from "../services/chat.service.js";
 
+const quickQuestions = [
+  "How do I reset my password?",
+  "Why is my order delayed?",
+  "How can I track my request?",
+  "I want to speak to an agent",
+  "How do I update my account details?",
+  "What is the refund process?"
+];
+
 const Chat = () => {
   const { user, token } = useAuth();
   const { pushToast } = useToast();
@@ -158,6 +167,10 @@ const Chat = () => {
     }
   };
 
+  const handleQuickQuestion = (question) => {
+    setInput(question);
+  };
+
   return (
     <div className="glass-card rounded-3xl p-6">
       <div className="flex items-center justify-between">
@@ -192,6 +205,22 @@ const Chat = () => {
             <div ref={bottomRef} />
           </div>
         )}
+      </div>
+
+      <div className="mt-4">
+        <p className="mb-2 text-xs uppercase tracking-[0.3em] text-white/40">Quick Questions</p>
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {quickQuestions.map((question) => (
+            <button
+              key={question}
+              type="button"
+              onClick={() => handleQuickQuestion(question)}
+              className="shrink-0 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:border-ember/40 hover:bg-ember/10 hover:text-white"
+            >
+              {question}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="mt-4 flex items-end gap-3">
