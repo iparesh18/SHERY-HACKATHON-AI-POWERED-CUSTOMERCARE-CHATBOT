@@ -28,10 +28,66 @@ const Chat = () => {
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const bottomRef = useRef(null);
   const ticketMetaRef = useRef(null);
 
   const canSend = useMemo(() => input.trim().length > 0 && !sending, [input, sending]);
+
+  // Search functionality - WhatsApp style
+  const filteredMessages = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const query = searchQuery.toLowerCase();
+    return messages
+      .map((msg, idx) => ({
+        index: idx,
+        message: msg,
+        matches: msg.text.toLowerCase().includes(query)
+      }))
+      .filter((item) => item.matches);
+  }, [messages, searchQuery]);
+
+  const totalMatches = filteredMessages.length;
+  const currentMatch = totalMatches > 0 ? filteredMessages[currentMatchIndex % totalMatches] : null;
+
+  // Highlight matching text within message
+  const highlightText = (text, query) => {
+    if (!query.trim()) return text;
+    const parts = text.split(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
+    return parts;
+  };
+
+  const handleNextMatch = () => {
+    if (totalMatches > 0) {
+      setCurrentMatchIndex((prev) => (prev + 1) % totalMatches);
+    }
+  };
+
+  const handlePrevMatch = () => {
+    if (totalMatches > 0) {
+      setCurrentMatchIndex((prev) => (prev - 1 + totalMatches) % totalMatches);
+    }
+  };
+
+  const [expandedResults, setExpandedResults] = useState({});
+
+  const clearSearch = () => {
+    setSearchQuery("");
+    setCurrentMatchIndex(0);
+    setExpandedResults({});
+    // Scroll to bottom after clearing search
+    setTimeout(() => {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 0);
+  };
+
+  const toggleExpanded = (index) => {
+    setExpandedResults((prev) => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
+  };
 
   const loadThread = async () => {
     setLoading(true);
@@ -199,22 +255,119 @@ const Chat = () => {
         </div>
       )}
 
+      {messages.length > 0 && (
+        <div className="mt-4 flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+          <input
+            type="text"
+            placeholder="Search messages..."
+            value={searchQuery}
+            onChange={(event) => {
+              setSearchQuery(event.target.value);
+              setCurrentMatchIndex(0);
+              setExpandedResults({});
+            }}
+            className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-ember/60"
+          />
+          {searchQuery && (
+            <div className="flex gap-1 sm:gap-2 flex-wrap sm:flex-nowrap">
+              <span className="text-xs text-white/60 whitespace-nowrap px-2 py-2 sm:py-0 flex items-center">
+                {totalMatches > 0 ? `${currentMatchIndex + 1}/${totalMatches}` : "No matches"}
+              </span>
+              <Button
+                className="px-2 sm:px-3 py-2 text-xs flex-1 sm:flex-none"
+                variant="ghost"
+                onClick={handlePrevMatch}
+                disabled={totalMatches === 0}
+              >
+                ↑
+              </Button>
+              <Button
+                className="px-2 sm:px-3 py-2 text-xs flex-1 sm:flex-none"
+                variant="ghost"
+                onClick={handleNextMatch}
+                disabled={totalMatches === 0}
+              >
+                ↓
+              </Button>
+              <Button
+                className="px-2 sm:px-3 py-2 text-xs flex-1 sm:flex-none"
+                variant="ghost"
+                onClick={clearSearch}
+              >
+                ✕
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="mt-6 h-[420px] overflow-y-auto rounded-2xl border border-white/10 bg-white/5 p-4">
         {loading ? (
           <p className="text-sm text-muted">Loading thread...</p>
         ) : messages.length === 0 ? (
           <p className="text-sm text-muted">Start the conversation.</p>
+        ) : searchQuery && filteredMessages.length === 0 ? (
+          <p className="text-sm text-muted">No messages match "{searchQuery}"</p>
         ) : (
           <div className="space-y-3">
-            {messages.map((message, index) => (
-              <ChatMessage
-                key={`${message.text}-${index}`}
-                message={message}
-                ticketMeta={ticketMeta}
-                onRate={() => setShowRatingModal(true)}
-              />
-            ))}
-            {sending && <SkeletonMessage lines={3} />}
+            {(searchQuery ? filteredMessages : messages.map((msg, idx) => ({ index: idx, message: msg }))).map((item) => {
+              const message = item.message;
+              const index = item.index;
+              const isCurrentMatch = searchQuery && currentMatch?.index === index;
+              
+              return (
+                <div
+                  key={`${message.text}-${index}`}
+                  className={`transition-all ${isCurrentMatch ? "rounded-lg bg-ember/20 border border-ember/40 p-3" : ""}`}
+                >
+                  {searchQuery && isCurrentMatch && (
+                    <p className="text-xs text-ember/80 mb-2">Match {currentMatchIndex + 1} of {totalMatches}</p>
+                  )}
+                  {searchQuery ? (
+                    <div className={`text-xs sm:text-sm ${message.sender === "agent" ? "text-blue-300" : "text-white"}`}>
+                      {(() => {
+                        const isExpanded = expandedResults[index];
+                        const messageText = message.text;
+                        const displayText = !isExpanded && messageText.length > 150 ? messageText.substring(0, 150) : messageText;
+                        const isLong = messageText.length > 150;
+                        
+                        return (
+                          <>
+                            <div className={`transition-all ${!isExpanded && isLong ? "line-clamp-3" : ""} ${isExpanded && isLong ? "rounded-lg bg-white/5 p-3 border border-white/10" : ""}`}>
+                              {highlightText(displayText, searchQuery).map((part, i) => 
+                                part.toLowerCase() === searchQuery.toLowerCase() ? (
+                                  <span key={i} className="bg-yellow-400/40 px-1 rounded font-semibold text-yellow-200">
+                                    {part}
+                                  </span>
+                                ) : (
+                                  <span key={i}>{part}</span>
+                                )
+                              )}
+                              {!isExpanded && isLong && <span>...</span>}
+                            </div>
+                            {isLong && (
+                              <button
+                                onClick={() => toggleExpanded(index)}
+                                className="text-xs text-ember hover:text-ember/80 mt-2 underline font-medium transition-colors"
+                              >
+                                {isExpanded ? "▲ Read less" : "▼ Read more"}
+                              </button>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  ) : (
+                    <ChatMessage
+                      message={message}
+                      ticketMeta={ticketMeta}
+                      onRate={() => setShowRatingModal(true)}
+                    />
+                  )}
+                </div>
+              );
+            })}
+            {sending && !searchQuery && <SkeletonMessage lines={3} />}
             <div ref={bottomRef} />
           </div>
         )}
