@@ -10,7 +10,7 @@
 
 ---
 
-## 🚀 Deployment to Render & Vercel
+## 🚀 Deployment to Render
 
 ### Backend → Render
 
@@ -65,14 +65,16 @@ USE_GROQ_ONLY=false
 
 ---
 
-### Frontend → Vercel
+### Frontend → Render Static Site
 
-**Step 1: Create Vercel Account**
-- Go to [vercel.com](https://vercel.com)
+**Step 1: Create Render Account**
+- Go to [render.com](https://render.com)
 - Sign up with GitHub
 
 **Step 2: Import Project**
-- Import your GitHub repo
+- Dashboard → New → Static Site
+- Connect your GitHub repo
+- Select your SHERY-HACKATHON repo
 
 **Step 3: Configure**
 - Framework: `Vite`
@@ -83,15 +85,15 @@ USE_GROQ_ONLY=false
 **Step 4: Environment Variables**
 Add one variable:
 ```
-VITE_API_BASE_URL=https://ai-support-backend.onrender.com/api
+VITE_API_URL=https://ai-support-backend.onrender.com/api
 ```
 (Replace with your actual Render backend URL)
 
 **Step 5: Deploy**
 - Click Deploy
-- Vercel builds automatically ✅
+- Render builds automatically ✅
 
-**Get Frontend URL:** Vercel shows URL like `https://your-app-name.vercel.app`
+**Get Frontend URL:** Render shows URL like `https://your-app-name.onrender.com`
 
 ---
 
@@ -120,12 +122,12 @@ npm run dev             # Still uses Vite dev server ✅
 
 ## 📊 Summary: What Happens Where
 
-| Action | Local Dev | Render | Vercel |
-|---|---|---|---|
-| `npm run dev` | ✅ Works normally | N/A | N/A |
-| Docker build | ❌ Not used | ✅ Auto-builds | ✅ Auto-builds |
-| Code changes | Local file | Git push → Auto-rebuild | Git push → Auto-rebuild |
-| Env changes | .env file | Render Dashboard | Vercel Dashboard |
+| Action | Local Dev | Render |
+|---|---|---|
+| `npm run dev` | ✅ Works normally | N/A |
+| Docker build | ❌ Not used | ✅ Auto-builds |
+| Code changes | Local file | Git push → Auto-rebuild |
+| Env changes | .env file | Render Dashboard |
 
 ---
 
