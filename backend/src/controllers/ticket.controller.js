@@ -45,18 +45,10 @@ const takeTicket = async (req, res, next) => {
       return fail(res, 409, "Already taken");
     }
 
-    emitToUser(ticket.userId?.toString(), "ticket:assigned", {
-      ticketId: ticket._id,
-      assignedTo: req.user.id
-    });
-    emitToUser(req.user.id, "ticket:assigned", {
-      ticketId: ticket._id,
-      assignedTo: req.user.id
-    });
-    emitToRole(ticket.orgId?.toString(), "admin", "ticket:assigned", {
-      ticketId: ticket._id,
-      assignedTo: req.user.id
-    });
+    const payload = { ticket: ticket.toObject() };
+    emitToUser(ticket.userId?.toString(), "ticket:assigned", payload);
+    emitToUser(req.user.id, "ticket:assigned", payload);
+    emitToRole(ticket.orgId?.toString(), "admin", "ticket:assigned", payload);
 
     return ok(res, "Ticket assigned", { ticket });
   } catch (error) {
@@ -81,18 +73,10 @@ const assignTicket = async (req, res, next) => {
       return fail(res, 404, "Ticket not found");
     }
 
-    emitToUser(ticket.userId?.toString(), "ticket:assigned", {
-      ticketId: ticket._id,
-      assignedTo: agentId
-    });
-    emitToUser(agentId, "ticket:assigned", {
-      ticketId: ticket._id,
-      assignedTo: agentId
-    });
-    emitToRole(ticket.orgId?.toString(), "admin", "ticket:assigned", {
-      ticketId: ticket._id,
-      assignedTo: agentId
-    });
+    const payload = { ticket: ticket.toObject() };
+    emitToUser(ticket.userId?.toString(), "ticket:assigned", payload);
+    emitToUser(agentId, "ticket:assigned", payload);
+    emitToRole(ticket.orgId?.toString(), "admin", "ticket:assigned", payload);
 
     return ok(res, "Ticket assigned", { ticket });
   } catch (error) {
@@ -119,21 +103,13 @@ const updateStatus = async (req, res, next) => {
     ticket.status = status;
     await ticket.save();
 
-    emitToUser(ticket.userId?.toString(), "ticket:status", {
-      ticketId: ticket._id,
-      status: ticket.status
-    });
+    const payload = { ticket: ticket.toObject() };
+    emitToUser(ticket.userId?.toString(), "ticket:status", payload);
 
     if (ticket.assignedTo) {
-      emitToUser(ticket.assignedTo.toString(), "ticket:status", {
-        ticketId: ticket._id,
-        status: ticket.status
-      });
+      emitToUser(ticket.assignedTo.toString(), "ticket:status", payload);
     }
-    emitToRole(ticket.orgId?.toString(), "admin", "ticket:status", {
-      ticketId: ticket._id,
-      status: ticket.status
-    });
+    emitToRole(ticket.orgId?.toString(), "admin", "ticket:status", payload);
 
     return ok(res, "Status updated", { ticket });
   } catch (error) {
@@ -166,11 +142,7 @@ const replyToTicket = async (req, res, next) => {
       { new: true, upsert: true }
     );
 
-    emitToUser(ticket.userId?.toString(), "ticket:message", {
-      ticketId: ticket._id,
-      sender: "agent",
-      text: message
-    });
+    emitToUser(ticket.userId?.toString(), "ticket:message", { ticket: ticket.toObject(), sender: "agent", text: message });
 
     // Also emit as chat:message so customer sees it in Chat page instantly
     emitToUser(ticket.userId?.toString(), "chat:message", {
@@ -180,17 +152,9 @@ const replyToTicket = async (req, res, next) => {
     });
 
     if (ticket.assignedTo) {
-      emitToUser(ticket.assignedTo.toString(), "ticket:message", {
-        ticketId: ticket._id,
-        sender: "agent",
-        text: message
-      });
+      emitToUser(ticket.assignedTo.toString(), "ticket:message", { ticket: ticket.toObject(), sender: "agent", text: message });
     }
-    emitToRole(ticket.orgId?.toString(), "admin", "ticket:message", {
-      ticketId: ticket._id,
-      sender: "agent",
-      text: message
-    });
+    emitToRole(ticket.orgId?.toString(), "admin", "ticket:message", { ticket: ticket.toObject(), sender: "agent", text: message });
 
     return created(res, "Reply sent", { ticket });
   } catch (error) {
@@ -211,13 +175,9 @@ const deleteTicket = async (req, res, next) => {
 
     await ticket.deleteOne();
 
-    emitToUser(ticket.userId?.toString(), "ticket:deleted", {
-      ticketId: ticket._id
-    });
+    emitToUser(ticket.userId?.toString(), "ticket:deleted", { ticketId: ticket._id });
     if (ticket.assignedTo) {
-      emitToUser(ticket.assignedTo.toString(), "ticket:deleted", {
-        ticketId: ticket._id
-      });
+      emitToUser(ticket.assignedTo.toString(), "ticket:deleted", { ticketId: ticket._id });
     }
     emitToRole(ticket.orgId?.toString(), "admin", "ticket:deleted", { ticketId: ticket._id });
     emitToRole(ticket.orgId?.toString(), "agent", "ticket:deleted", { ticketId: ticket._id });
@@ -354,18 +314,9 @@ const submitRating = async (req, res, next) => {
 
     // Emit to agent and admin
     if (ticket.assignedTo) {
-      emitToUser(ticket.assignedTo.toString(), "ticket:rated", {
-        ticketId: ticket._id,
-        rating,
-        ratingText: ratingText?.trim() || null
-      });
+      emitToUser(ticket.assignedTo.toString(), "ticket:rated", { ticket: ticket.toObject(), rating, ratingText: ratingText?.trim() || null });
     }
-    emitToRole(ticket.orgId?.toString(), "admin", "ticket:rated", {
-      ticketId: ticket._id,
-      rating,
-      ratingText: ratingText?.trim() || null,
-      userId
-    });
+    emitToRole(ticket.orgId?.toString(), "admin", "ticket:rated", { ticket: ticket.toObject(), rating, ratingText: ratingText?.trim() || null, userId });
 
     return ok(res, "Rating submitted", { ticket });
   } catch (error) {

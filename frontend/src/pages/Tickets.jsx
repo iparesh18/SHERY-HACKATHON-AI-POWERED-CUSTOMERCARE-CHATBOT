@@ -68,23 +68,50 @@ const Tickets = () => {
   useEffect(() => {
     if (!socket || !debouncedRefreshRef.current) return undefined;
 
-    const handleRefresh = () => debouncedRefreshRef.current();
+    const fallbackRefresh = () => debouncedRefreshRef.current();
 
-    // Listen to all ticket events for real-time updates
-    socket.on("ticket:created", handleRefresh);
-    socket.on("ticket:assigned", handleRefresh);
-    socket.on("ticket:status", handleRefresh);
-    socket.on("ticket:message", handleRefresh);
-    socket.on("ticket:deleted", handleRefresh);
-    socket.on("ticket:rated", handleRefresh);
+    const handleCreated = (payload = {}) => {
+      if (payload?.ticket) {
+        setTickets((prev) => {
+          // avoid duplicate
+          if (prev.find((t) => t._id === payload.ticket._id)) return prev;
+          return [payload.ticket, ...prev];
+        });
+        return;
+      }
+      fallbackRefresh();
+    };
+
+    const handleUpdate = (payload = {}) => {
+      if (payload?.ticket) {
+        setTickets((prev) => prev.map((t) => (t._id === payload.ticket._id ? payload.ticket : t)));
+        return;
+      }
+      fallbackRefresh();
+    };
+
+    const handleDeleted = (payload = {}) => {
+      if (payload?.ticketId) {
+        setTickets((prev) => prev.filter((t) => t._id !== payload.ticketId));
+        return;
+      }
+      fallbackRefresh();
+    };
+
+    socket.on("ticket:created", handleCreated);
+    socket.on("ticket:assigned", handleUpdate);
+    socket.on("ticket:status", handleUpdate);
+    socket.on("ticket:message", handleUpdate);
+    socket.on("ticket:deleted", handleDeleted);
+    socket.on("ticket:rated", handleUpdate);
 
     return () => {
-      socket.off("ticket:created", handleRefresh);
-      socket.off("ticket:assigned", handleRefresh);
-      socket.off("ticket:status", handleRefresh);
-      socket.off("ticket:message", handleRefresh);
-      socket.off("ticket:deleted", handleRefresh);
-      socket.off("ticket:rated", handleRefresh);
+      socket.off("ticket:created", handleCreated);
+      socket.off("ticket:assigned", handleUpdate);
+      socket.off("ticket:status", handleUpdate);
+      socket.off("ticket:message", handleUpdate);
+      socket.off("ticket:deleted", handleDeleted);
+      socket.off("ticket:rated", handleUpdate);
     };
   }, [socket]);
 

@@ -100,6 +100,19 @@ const Chat = () => {
     // Listen for rating submissions
     const onTicketRated = (payload = {}) => {
       const currentTicketId = ticketMetaRef.current?.ticketId;
+
+      if (payload?.ticket) {
+        if (payload.ticket._id !== currentTicketId) return;
+        setTicketMeta((prev) => ({
+          ...(prev || {}),
+          ticketId: payload.ticket._id,
+          status: payload.ticket.status || prev?.status,
+          customerRating: payload.ticket.customerRating ?? prev?.customerRating,
+          ratingText: payload.ticket.ratingText ?? prev?.ratingText
+        }));
+        return;
+      }
+
       if (!payload?.ticketId || payload.ticketId !== currentTicketId) return;
       setTicketMeta((prev) => ({
         ...prev,

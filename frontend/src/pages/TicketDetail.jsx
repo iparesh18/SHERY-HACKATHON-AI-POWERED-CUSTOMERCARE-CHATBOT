@@ -53,22 +53,37 @@ const TicketDetail = () => {
     if (!socket) return undefined;
 
     const onTicketMessage = (payload = {}) => {
-      if (!payload || payload.ticketId !== id) return;
-      if (payload.text) {
-        setTicket((prev) => {
-          if (!prev) return prev;
-          return { ...prev, messages: [...(prev.messages || []), { sender: payload.sender || "agent", text: payload.text }] };
-        });
-      } else {
-        // fallback to full refresh when payload doesn't include message text
+      if (!payload) return;
+      // If backend sent full ticket object, replace local ticket
+      if (payload.ticket && payload.ticket._id === id) {
+        setTicket(payload.ticket);
+        setStatus(payload.ticket.status || "");
+        return;
+      }
+      // legacy payload: ticketId + text
+      if (payload.ticketId && payload.ticketId === id) {
+        if (payload.text) {
+          setTicket((prev) => {
+            if (!prev) return prev;
+            return { ...prev, messages: [...(prev.messages || []), { sender: payload.sender || "agent", text: payload.text }] };
+          });
+          return;
+        }
         fetchTicket();
       }
     };
 
     const onTicketStatus = (payload = {}) => {
-      if (!payload || payload.ticketId !== id) return;
-      setStatus(payload.status || "");
-      setTicket((prev) => (prev ? { ...prev, status: payload.status || prev.status } : prev));
+      if (!payload) return;
+      if (payload.ticket && payload.ticket._id === id) {
+        setTicket(payload.ticket);
+        setStatus(payload.ticket.status || "");
+        return;
+      }
+      if (payload.ticketId && payload.ticketId === id) {
+        setStatus(payload.status || "");
+        setTicket((prev) => (prev ? { ...prev, status: payload.status || prev.status } : prev));
+      }
     };
 
     socket.on("ticket:message", onTicketMessage);

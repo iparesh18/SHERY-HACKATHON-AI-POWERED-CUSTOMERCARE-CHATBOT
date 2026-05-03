@@ -151,9 +151,13 @@ Answer clearly and naturally.`;
       // Avoid emitting a duplicate `chat:message` to the same user socket to
       // prevent the client from receiving the same AI message twice.
 
-      emitToRole(orgId, "agent", "ticket:created", { ticketId: ticket._id, userId });
-      emitToRole(orgId, "admin", "ticket:created", { ticketId: ticket._id, userId });
-      emitToUser(userId, "ticket:created", { ticketId: ticket._id, status: ticket.status });
+      // Emit the full ticket object so dashboards can update instantly without refetch
+      const ticketPayload = {
+        ticket: ticket.toObject()
+      };
+      emitToRole(orgId, "agent", "ticket:created", ticketPayload);
+      emitToRole(orgId, "admin", "ticket:created", ticketPayload);
+      emitToUser(userId, "ticket:created", { ticket: ticket.toObject(), status: ticket.status });
 
       return res.status(201).json({ 
         success: true, 
