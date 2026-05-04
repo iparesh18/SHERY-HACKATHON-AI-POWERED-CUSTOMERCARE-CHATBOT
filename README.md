@@ -10,8 +10,8 @@
   <img src="https://img.shields.io/badge/Groq-AI-black?style=for-the-badge"/>
   <img src="https://img.shields.io/badge/Gemini-AI-blue?style=for-the-badge"/>
 </p>
-> **Intelligent Customer Care That Understands Emotion, Scales Infinitely, and Syncs in Real-Time**
->
+ **Intelligent Customer Care That Understands Emotion, Scales Infinitely, and Syncs in Real-Time**
+
 > A production-ready support platform combining advanced AI (Gemini + Groq), vector embeddings (Pinecone), real-time sync (Socket.IO + Redis), and enterprise architecture (PM2 cluster) to deliver next-generation customer experience.
 
 ---
