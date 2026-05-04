@@ -1,5 +1,15 @@
 # 🎯 Atlas Support - Enterprise-Grade AI Customer Support Platform
-
+<p align="center">
+  <img src="https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Express-black?style=for-the-badge&logo=express&logoColor=white"/>
+  <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB"/>
+  <img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Redis-DD0031?style=for-the-badge&logo=redis&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Socket.IO-black?style=for-the-badge&logo=socketdotio&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Pinecone-VectorDB-blue?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/Groq-AI-black?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/Gemini-AI-blue?style=for-the-badge"/>
+</p>
 > **Intelligent Customer Care That Understands Emotion, Scales Infinitely, and Syncs in Real-Time**
 >
 > A production-ready support platform combining advanced AI (Gemini + Groq), vector embeddings (Pinecone), real-time sync (Socket.IO + Redis), and enterprise architecture (PM2 cluster) to deliver next-generation customer experience.
